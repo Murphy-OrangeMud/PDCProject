@@ -12,6 +12,7 @@ void Hines(double *u, double *l, double *d, double *rhs, int *p, int cellSize) {
         rhs[p[i]] -= factor * rhs[i];
     }
     rhs[0] /= d[0];
+    //return;
     for (i = 1; i <= cellSize - 1; i++) {
         rhs[i] -= l[i] * rhs[p[i]];
         rhs[i] /= d[i];

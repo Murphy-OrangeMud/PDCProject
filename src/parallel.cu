@@ -8,22 +8,33 @@ using namespace std;
 #define dsize  ((cellSize) * sizeof(double))
 #define isize  ((cellSize) * sizeof(int))
 
+__device__ double atomicSub(double* address, double val) {
+    unsigned long long int* address_as_ull = (unsigned long long int*)address;
+    unsigned long long int old = *address_as_ull, assumed;
+    do {
+         assumed = old;
+         old = atomicCAS(address_as_ull, assumed, __double_as_longlong(__longlong_as_double(assumed) - val)); // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
+    } while (assumed != old);
+    return __longlong_as_double(old);
+}
+
 __global__ void
 Forward(double *u, double *l, double *d, double *rhs, int *p, int *s, int *son, int cellSize, int start) {
     int cur = start;
     while (s[cur] == 1) {
         rhs[cur] -= l[cur] * rhs[p[cur]];
         rhs[cur] /= d[cur];
-        cur = son[cur][0];
+        cur = son[cur];
     }
 
     if (s[cur] == 0) return;
 
-    cudaStream_t stream[s[cur]];
+    //cudaStream_t stream[s[cur]];
+    cudaStream_t stream[10]; // 猜想应该儿子不会超过10个
     for (int i = 0; i < s[cur]; i++) {
-        cudaStreamCreate(&s[cur]);
-        Forward(u, l, d, rhs, p, s, son, cellSize, son[i]);
-        cudaStreamDestroy(s[cur]);
+        cudaStreamCreate(&stream[i]);
+        Forward<<<1, 1, 0, stream[i]>>>(u, l, d, rhs, p, s, son, cellSize, son[i]);
+        cudaStreamDestroy(stream[i]);
     }
 }
 
@@ -35,11 +46,11 @@ Backward(double *u, double *l, double *d, double *rhs, int *p, int *s, int *son,
         factor = u[cur] / d[cur];
         d[p[cur]] -= factor * l[cur];
         rhs[p[cur]] -= factor * rhs[cur];
-        cur = p[cur];
+        cur = p[cur * cellSize];
     }
     if (cur > 0) {
         factor = u[cur] / d[cur];
-        atomicSub(&d[p[i]], factor * l[cur]);
+        atomicSub(&d[p[cur]], factor * l[cur]);
         atomicSub(&rhs[p[cur]], factor * rhs[cur]);
     }
     cur = p[cur];
@@ -83,9 +94,9 @@ hines(double *u, double *l, double *d, double *rhs, int *p, int *s, int *son, in
     // forward
     cudaStream_t stream[s[0]];
     for (int i = 0; i < s[cur]; i++) {
-        cudaStreamCreate(&s[cur]);
-        Forward(u, l, d, rhs, p, s, son, cellSize, son[i]);
-        cudaStreamDestroy(s[cur]);
+        cudaStreamCreate(&stream[i]);
+        Forward<<<1, 1, 0, stream[i]>>>(u, l, d, rhs, p, s, son, cellSize, son[i]);
+        cudaStreamDestroy(stream[i]);
     }
     cudaDeviceSynchronize();
 }
@@ -95,7 +106,7 @@ int main(int argc, char *argv[]) {
     cudaSetDevice(devID);
 
     cudaError_t error;
-    cudaDevice Prop deviceProp;
+    cudaDevice_Prop deviceProp;
     error = cudaGetDevice(&devID);
 
     if (error != cudaSuccess) {
