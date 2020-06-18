@@ -1,0 +1,5 @@
+将script.py中的被注释掉的代码去掉多引号并运行，即可生成sresult和presult下所有的数据，并打印出三种程序在100次试验下所有case下所用的时间的平均值。
+Time_Cost_Table是100次运行的时间消耗数据。其中第三行是Serial程序的运行时间，但是因为写脚本的时候复制错了，第三行也写成了Parallel。由于这个脚本运行时间太长，就不再运行第二次了。但是对脚本输出的结果没有影响。脚本输出的实验结果放在了report当中。
+script.py用了管道机制。如果直接命令行手工输入编译、运行的话则会在命令行输出运行时间。
+parallel有两个版本，分别是parallel1.cc和parallel2.cc，分别对应report中的parallel1方法和parallel2方法。
+presult中的p1case%d.txt和p2case%d.txt分别对应两种算法的计算结果。
